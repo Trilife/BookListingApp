@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Book Listing App</string>
+    <string name="google_books_api">https://www.googleapis.com/books/v1/volumes?q=</string>
+</resources>
