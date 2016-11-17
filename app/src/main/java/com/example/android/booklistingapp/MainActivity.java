@@ -25,6 +25,8 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
+import static android.icu.lang.UCharacter.GraphemeClusterBreak.L;
+
 
 public class MainActivity extends AppCompatActivity {
 
@@ -50,20 +52,24 @@ public class MainActivity extends AppCompatActivity {
 
         mSearchButton = (Button) findViewById(R.id.search_button);
         mSearchTerm = (EditText) findViewById(R.id.search_term);
+        // initialize finalUrl, so it doesn't return null errors
+        finalUrl = "";
 
         mSearchButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 String searchTerm = mSearchTerm.getText().toString();
-                finalUrl = getString(R.string.google_books_api) + searchTerm;
+                finalUrl = getString(R.string.google_books_api) + searchTerm + getString(R.string.record_limiter);
                 Log.v("EditText", mSearchTerm.getText().toString());
-                displayTestSearchTerm("final URL: " + finalUrl);
+                Log.v("display finalURL", finalUrl);
+                //Kick off a new AsyncTask to perform the network request
+                BookAsyncTask task = new BookAsyncTask();
+                task.execute();
+                //displayTestSearchTerm("final URL: " + finalUrl);
             }
         });
-        //Kick off a new AsyncTask to perform the network request
-        BookAsyncTask task = new BookAsyncTask();
-        task.execute();
     }
+
     /**
      * Update the screen to display information from the given {@link Book}.
      */
@@ -73,11 +79,13 @@ public class MainActivity extends AppCompatActivity {
         // Display the book title in the UI
         TextView titleTextView = (TextView) findViewById(R.id.title);
         titleTextView.setText(book.getTitle());
+        Log.v("within updateUi: ", book.getTitle());
 
         // Display the book author in the UI
         TextView dateTextView = (TextView) findViewById(R.id.author);
         dateTextView.setText(book.getAuthors());
     }
+
     /**
      * {@link AsyncTask} to perform the network request on a background thread, and then
      * update the UI with the books in the response.
@@ -94,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
             try {
                 jsonResponse = makeHttpRequest(url);
             } catch (IOException e) {
-                Log.e(LOG_TAG, "Problem parsing the earthquake JSON results", e);
+                Log.e(LOG_TAG, "Problem parsing the book JSON results", e);
             }
 
             // Extract relevant fields from the JSON response and create an {@link Event} object
@@ -111,9 +119,10 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute(Book book) {
             if (book == null) {
+                Log.v("book", "is null");
                 return;
             }
-
+            Log.v("in onPostExecute", "again");
             updateUi(book);
         }
 
@@ -153,7 +162,7 @@ public class MainActivity extends AppCompatActivity {
                     Log.e(LOG_TAG, "error code: " + urlConnection.getResponseCode());
                 }
             } catch (IOException e) {
-                Log.e(LOG_TAG, "Problem parsing the earthquake JSON results", e);
+                Log.e(LOG_TAG, "Problem parsing the book JSON results", e);
             } finally {
                 if (urlConnection != null) {
                     urlConnection.disconnect();
@@ -189,66 +198,6 @@ public class MainActivity extends AppCompatActivity {
          * //     * parsing the given JSON response.
          * //
          */
-//        private List<Book> extractItemsFromJson(String bookJSON) {
-//            // If the JSON string is empty or null, then return early.
-//            if (TextUtils.isEmpty(bookJSON)) {
-//                return null;
-//            }
-//
-//            // Create an empty ArrayList that we can start adding books to
-//            List<Book> books = new ArrayList<>();
-//
-//            // Try to parse the JSON response string. If there's a problem with the way the JSON
-//            // is formatted, a JSONException exception object will be thrown.
-//            // Catch the exception so the app doesn't crash, and print the error message to the logs.
-//            try {
-//
-//                // Create a JSONObject from the JSON response string
-//                JSONObject baseJsonResponse = new JSONObject(bookJSON);
-//
-//                // Extract the JSONArray associated with the key called "features",
-//                // which represents a list of features (or earthquakes).
-//                JSONArray bookArray = baseJsonResponse.getJSONArray("items");
-//
-//                // For each book in the bookArray, create an {@link Book} object
-//                for (int i = 0; i < bookArray.length(); i++) {
-//
-//                    // Get a single earthquake at position i within the list of earthquakes
-//                    JSONObject currentBook = bookArray.getJSONObject(i);
-//
-//                    // For a given book, extract the JSONObject associated with the
-//                    // key called "volumeInfo", which represents a list of all properties
-//                    // for that book.
-//                    JSONObject volumeInfo = currentBook.getJSONObject("volumeInfo");
-//
-//                    // Extract the value for the key called "title"
-//                    String title = volumeInfo.getString("title");
-//
-//                    // Extract the value for the key called "authors"
-//                    String authors = volumeInfo.getString("authors");
-//
-//                    // and url from the JSON response.
-//                    Book book = new Book(title, authors);
-//
-//                    // Add the new {@link Earthquake} to the list of earthquakes.
-//                    books.add(book);
-//                }
-//
-//            } catch (JSONException e) {
-//                // If an error is thrown when executing any of the above statements in the "try" block,
-//                // catch the exception here, so the app doesn't crash. Print a log message
-//                // with the message from the exception.
-//                Log.e(LOG_TAG, "Problem parsing the earthquake JSON results", e);
-//            }
-//
-//            // Return the list of books
-//            return books;
-//        }
-        /**
-         * //     * Return a list of {@link Book} objects that has been built up from
-         * //     * parsing the given JSON response.
-         * //
-         */
         private Book extractItemsFromJson(String bookJSON) {
 
             // If the JSON string is empty or null, then return early.
@@ -257,7 +206,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             // Create an empty ArrayList that we can start adding books to
-           // List<Book> books = new ArrayList<>();
+            List<Book> books = new ArrayList<>();
 
             // Try to parse the JSON response string. If there's a problem with the way the JSON
             // is formatted, a JSONException exception object will be thrown.
@@ -271,8 +220,11 @@ public class MainActivity extends AppCompatActivity {
                 // which represents a list of features (or earthquakes).
                 JSONArray bookArray = baseJsonResponse.getJSONArray("items");
 
+                // For each book in the bookArray, create a (@link Book) object
+                for (int i = 0; i < bookArray.length(); i++) {
+
                     // Get a single earthquake at position i within the list of earthquakes
-                    JSONObject currentBook = bookArray.getJSONObject(0);
+                    JSONObject currentBook = bookArray.getJSONObject(i);
 
                     // For a given book, extract the JSONObject associated with the
                     // key called "volumeInfo", which represents a list of all properties
@@ -281,14 +233,22 @@ public class MainActivity extends AppCompatActivity {
 
                     // Extract the value for the key called "title"
                     String title = volumeInfo.getString("title");
-                    Log.v(LOG_TAG, "parsed title: " + title);
+                    Log.v(LOG_TAG, "parsed title: " + title + " i= " +i);
                     // Extract the value for the key called "authors"
                     String authors = volumeInfo.getString("authors");
                     Log.v(LOG_TAG, "parsed authors: " + authors);
 
-                    // and url from the JSON response.
-                    return new Book(title, authors);
+                    //TODO add url here as well
 
+                    // Create a new (@link Book) object with title and author
+                    Book book = new Book(title, authors);
+
+                    // Add the new (@link Book) to the list of books
+                    books.add(book);
+//
+//                    // and url from the JSON response.
+//                    return new Book(title, authors);
+                }
 
             } catch (JSONException e) {
                 // If an error is thrown when executing any of the above statements in the "try" block,
@@ -298,29 +258,45 @@ public class MainActivity extends AppCompatActivity {
             }
 
             // Return the list of books
-            return null;
+            Log.v("returning from", "extractItems");
+            return null;  // This is supposed to return books, but does not want to
         }
 
     }
-    /** Define the Book Object that holds the details of the book*/
+
+    /**
+     * Define the Book Object that holds the details of the book
+     */
     public class Book {
-        /** Title of the Book*/
-        private String mTitle;
+        /**
+         * Title of the Book
+         */
+        public String mTitle;
 
-        /** Author of the book */
+        /**
+         * Author of the book
+         */
         //TODO might need to turn this in to an array to catch more authors
-        private String mAuthors;
+        public String mAuthors;
 
-        /** Construt a new Book object*/
+        /**
+         * Construt a new Book object
+         */
         public Book(String title, String authors) {
-            title = mTitle;
-            authors = mAuthors;
+            mTitle = title;
+            mAuthors = authors;
         }
-        /**define the constructors for the new object*/
-        public String getTitle() {return mTitle; }
-        public String getAuthors() {return mAuthors; }
 
+        /**
+         * define the constructors for the new object
+         */
+        public String getTitle() {
+            return mTitle;
+        }
 
+        public String getAuthors() {
+            return mAuthors;
+        }
 
     }
 
@@ -328,6 +304,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.list_item);
         Log.v("searchTerm", searchTerm);
         TextView testTextView = (TextView) findViewById(R.id.author);
-        testTextView.setText("result" + searchTerm);
+        testTextView.setText(searchTerm);
     }
 }
